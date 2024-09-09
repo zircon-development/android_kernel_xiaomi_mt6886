@@ -389,7 +389,7 @@ static const u8 *mphy_str[] = {
 
 extern void mt_irq_dump_status(unsigned int irq);
 static int ufs_mtk_auto_hibern8_disable(struct ufs_hba *hba);
-
+extern struct ufscld_dev *cld;
 
 #include <trace/events/ufs.h>
 
@@ -651,6 +651,9 @@ static int ufs_mtk_setup_ref_clk(struct ufs_hba *hba, bool on)
 	struct arm_smccc_res res;
 	ktime_t timeout, time_checked;
 	u32 value;
+#ifdef CONFIG_SCSI_UFS_XIAOMI_EBUFF
+	u32 val = 0;
+#endif
 
 	if (host->ref_clk_enabled == on)
 		return 0;
@@ -660,10 +663,18 @@ static int ufs_mtk_setup_ref_clk(struct ufs_hba *hba, bool on)
 	if (on) {
 		ufshcd_writel(hba, REFCLK_REQUEST, REG_UFS_REFCLK_CTRL);
 	} else {
+#ifdef CONFIG_SCSI_UFS_XIAOMI_EBUFF
+		if (ebuff_value_u32("ref_clk_always_on", &val)){
+			dev_info(hba->dev, "%s: ebuff ref_clk_always_on(%d)\n", __func__, val);
+			goto ebuff_ref_clk_always_on;
+		}
+#endif
 		ufshcd_delay_us(host->ref_clk_gating_wait_us, 10);
 		ufshcd_writel(hba, REFCLK_RELEASE, REG_UFS_REFCLK_CTRL);
 	}
-
+#ifdef CONFIG_SCSI_UFS_XIAOMI_EBUFF
+ebuff_ref_clk_always_on:
+#endif
 	/* Wait for ack */
 	timeout = ktime_add_us(ktime_get(), REFCLK_REQ_TIMEOUT_US);
 	do {
@@ -1003,6 +1014,9 @@ static void ufs_mtk_init_host_caps(struct ufs_hba *hba)
 	struct ufs_mtk_host *host = ufshcd_get_variant(hba);
 	struct device_node *np = hba->dev->of_node;
 	struct tag_bootmode *tag = NULL;
+#ifdef CONFIG_SCSI_UFS_XIAOMI_EBUFF
+	u32 val = 0;
+#endif
 
 	if (of_property_read_bool(np, "mediatek,ufs-boost-crypt"))
 		ufs_mtk_init_boost_crypt(hba);
@@ -1040,6 +1054,18 @@ static void ufs_mtk_init_host_caps(struct ufs_hba *hba)
 	else if (tag->boottype == BOOTDEV_UFS)
 		host->boot_device = true;
 
+#ifdef CONFIG_SCSI_UFS_XIAOMI_EBUFF
+	if (ebuff_value_u32("host_caps", &val)) {
+		u32 mask = 0;
+		if (ebuff_value_u32("host_caps_mask", &mask)) {
+			host->caps = (host->caps & (~mask)) | (val & mask);
+			dev_info(hba->dev, "%s: ebuff origin caps 0x%x val 0x%x mask 0x%x\n", __func__, host->caps, val, mask);
+		} else {
+			host->caps |= val;
+			dev_info(hba->dev, "%s: ebuff origin caps 0x%x val 0x%x\n", __func__, host->caps, val);
+		}
+	}
+#endif
 }
 
 /**
@@ -1204,12 +1230,13 @@ static void ufs_mtk_trace_vh_compl_command_vend_ss(struct ufs_hba *hba,
 }
 
 static void ufs_mtk_trace_vh_send_tm_command_vend_ss(void *data, struct ufs_hba *hba,
-			int tag, int str_t)
+			int tag, const char *str)
 {
 	struct ufsf_feature *ufsf = ufs_mtk_get_ufsf(hba);
 
-	if (str_t == UFS_TM_COMP)
+	if (strcmp(str, "tm_complete") == 0)
 		ufsf_reset_lu(ufsf);
+
 }
 
 static void ufs_mtk_trace_vh_update_sdev_vend_ss(void *data, struct scsi_device *sdev)
@@ -3280,7 +3307,7 @@ static int ufs_mtk_suspend_check(struct ufs_hba *hba, enum ufs_pm_op pm_op)
 		s_node) {
 
 		/* If consumer is active, stop supplier enter suspend. */
-		if (link->consumer->power.runtime_status != RPM_SUSPENDED) {
+		if (link->consumer->power.runtime_status == RPM_ACTIVE) {
 			err = -EBUSY;
 			goto out;
 		}
@@ -3393,8 +3420,6 @@ static void ufs_mtk_dbg_register_dump(struct ufs_hba *hba)
 #endif
 
 	mt_irq_dump_status(hba->irq);
-
-	ufshcd_dump_regs(hba, 0, REG_INTERRUPT_STATUS, "Intr. Status (0x0):");
 
 	/* Dump ufshci register 0x 0~ 0xA0 */
 	ufshcd_dump_regs(hba, 0, UFSHCI_REG_SPACE_SIZE, "UFSHCI (0x0):");
@@ -3548,8 +3573,14 @@ static void ufs_mtk_event_notify(struct ufs_hba *hba,
 	unsigned int val = *(u32 *)data;
 	unsigned long reg;
 	uint8_t bit;
+	u32 set;
 
 	trace_ufs_mtk_event(evt, val);
+
+#if IS_ENABLED(CONFIG_MI_ERROR_STATE)
+	ufshcd_update_err_state(evt, val);
+	ufshcd_update_uic_error_cnt(evt, val);
+#endif
 
 	/* Print details of UIC Errors */
 	if (evt <= UFS_EVT_DME_ERR) {
@@ -3581,6 +3612,13 @@ static void ufs_mtk_event_notify(struct ufs_hba *hba,
 		ufs_mtk_mphy_record(hba, UFS_MPHY_UIC);
 #endif
 		ufs_mtk_dbg_register_dump(hba);
+	}
+
+	if (evt == UFS_EVT_FATAL_ERR) {
+		/* Disable UIC error intr to stop consecutive irq */
+		set = ufshcd_readl(hba, REG_INTERRUPT_ENABLE);
+		set &= ~UFSHCD_ERROR_MASK;
+		ufshcd_writel(hba, set, REG_INTERRUPT_ENABLE);
 	}
 
 	/*
@@ -3841,7 +3879,9 @@ skip_phy:
 	/* Get IRQ */
 	ufs_mtk_mcq_get_irq(pdev);
 	ufs_mtk_mcq_install_tracepoints();
-
+#ifdef CONFIG_SCSI_UFS_XIAOMI_EBUFF
+	of_obtain_ebuffha_info();
+#endif
 	/* perform generic probe */
 	err = ufshcd_pltfrm_init(pdev, &ufs_hba_mtk_vops);
 	if (err) {
@@ -3933,6 +3973,11 @@ int ufs_mtk_system_suspend(struct device *dev)
 		ufsf_suspend(ufsf);
 #endif
 
+#if IS_ENABLED(CONFIG_SCSI_UFS_XIAOMI_CLD)
+	if (ufscld_get_state(cld) == CLD_PRESENT)
+		ufscld_suspend(cld);
+#endif
+
 	/* Check if shutting down */
 	if (!ufshcd_is_user_access_allowed(hba)) {
 		ret = -EBUSY;
@@ -3950,6 +3995,12 @@ out:
 	if (ret && ufsf)
 		ufsf_resume(ufsf, true);
 #endif
+
+#if IS_ENABLED(CONFIG_SCSI_UFS_XIAOMI_CLD)
+	if (ret && ufscld_get_state(cld) == CLD_SUSPEND)
+		ufscld_resume(cld);
+#endif
+
 	if (ret)
 		up(&host->rpmb_sem);
 
@@ -3975,6 +4026,11 @@ int ufs_mtk_system_resume(struct device *dev)
 		ufsf_resume(ufsf, is_link_off);
 #endif
 
+#if IS_ENABLED(CONFIG_SCSI_UFS_XIAOMI_CLD)
+	if (!ret && ufscld_get_state(cld) == CLD_SUSPEND)
+		ufscld_resume(cld);
+#endif
+
 	host = ufshcd_get_variant(hba);
 	if (!ret)
 		up(&host->rpmb_sem);
@@ -3995,6 +4051,12 @@ int ufs_mtk_runtime_suspend(struct device *dev)
 	if (ufsf->hba)
 		ufsf_suspend(ufsf);
 #endif
+
+#if IS_ENABLED(CONFIG_SCSI_UFS_XIAOMI_CLD)
+	if (ufscld_get_state(cld) == CLD_PRESENT)
+		ufscld_suspend(cld);
+#endif
+
 	ret = ufshcd_runtime_suspend(dev);
 
 	if (!ret)
@@ -4006,6 +4068,10 @@ int ufs_mtk_runtime_suspend(struct device *dev)
 		ufsf_resume(ufsf, true);
 #endif
 
+#if IS_ENABLED(CONFIG_SCSI_UFS_XIAOMI_CLD)
+	if (ret && ufscld_get_state(cld) == CLD_SUSPEND)
+		ufscld_resume(cld);
+#endif
 	if (!ret && (host->phy_dev))
 		pm_runtime_put_sync(host->phy_dev);
 
@@ -4035,6 +4101,11 @@ int ufs_mtk_runtime_resume(struct device *dev)
 		ufsf_resume(ufsf, is_link_off);
 #endif
 
+#if IS_ENABLED(CONFIG_SCSI_UFS_XIAOMI_CLD)
+	if (!ret && ufscld_get_state(cld) == CLD_SUSPEND)
+		ufscld_resume(cld);
+#endif
+
 	return ret;
 }
 
@@ -4049,6 +4120,10 @@ void ufs_mtk_shutdown(struct platform_device *pdev)
 		ufsf_suspend(ufsf);
 #endif
 
+#if IS_ENABLED(CONFIG_SCSI_UFS_XIAOMI_CLD)
+	if (ufscld_get_state(cld) == CLD_PRESENT)
+		ufscld_suspend(cld);
+#endif
 	/*
 	 * ufshcd_wl_shutdown may run concurrently and have racing problem.
 	 * ufshcd_pltfrm_shutdown only turn off power and clock, which is not
