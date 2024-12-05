@@ -62,3 +62,4 @@ obj-$(CONFIG_SND_SOC)	+= uniphier/
 obj-$(CONFIG_SND_SOC)	+= ux500/
 obj-$(CONFIG_SND_SOC)	+= xilinx/
 obj-$(CONFIG_SND_SOC)	+= xtensa/
+obj-$(CONFIG_USB_SWITCH_ET7480)	+= et7480/
