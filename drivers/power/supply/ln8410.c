@@ -191,7 +191,7 @@ static int ln8410_enable_qb(struct ln8410_device *chip, bool enable)
 	return ret;
 }
 
-static ln8410_set_infet_shdn_cfg(struct ln8410_device *chip, bool enable)
+static int ln8410_set_infet_shdn_cfg(struct ln8410_device *chip, bool enable)
 {
 	int ret = 0;
 	;
@@ -205,7 +205,7 @@ static ln8410_set_infet_shdn_cfg(struct ln8410_device *chip, bool enable)
 	return ret;
 }
 
-static ln8410_set_bst_live_mask(struct ln8410_device *chip, bool enable)
+static int ln8410_set_bst_live_mask(struct ln8410_device *chip, bool enable)
 {
 	int ret;
 
