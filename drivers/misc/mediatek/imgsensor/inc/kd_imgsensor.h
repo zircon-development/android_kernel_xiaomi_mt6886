@@ -625,6 +625,20 @@
 #define SENSOR_DRVNAME_OV13B10_MIPI_RAW         "ov13b10_mipi_raw"
 #define SENSOR_DRVNAME_OV02B10_MIPI_RAW         "ov02b10_mipi_raw"
 
+/*ZIRCON ADD START*/
+#define ZIRCONS5KHP3SUNNY_SENSOR_ID                  0x1B73
+#define SENSOR_DRVNAME_ZIRCONS5KHP3SUNNY_MIPI_RAW    "zircons5khp3sunny_mipi_raw"
+
+#define ZIRCONOV16A1QSUNNY_SENSOR_ID                 0x1641
+#define SENSOR_DRVNAME_ZIRCONOV16A1QSUNNY_MIPI_RAW   "zirconov16a1qsunny_mipi_raw"
+
+#define ZIRCONIMX355SUNNY_SENSOR_ID                  0x0355
+#define SENSOR_DRVNAME_ZIRCONIMX355SUNNY_MIPI_RAW    "zirconimx355sunny_mipi_raw"
+
+#define ZIRCONOV02B10SUNNY_SENSOR_ID                 0x002B
+#define SENSOR_DRVNAME_ZIRCONOV02B10SUNNY_MIPI_RAW   "zirconov02b10sunny_mipi_raw"
+/*ZIRCON ADD END*/
+
 /******************************************************************************
  *
  ******************************************************************************/
