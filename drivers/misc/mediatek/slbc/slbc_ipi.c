@@ -65,7 +65,7 @@ int slbc_sspm_slc_disable(int disable)
 }
 EXPORT_SYMBOL_GPL(slbc_sspm_slc_disable);
 
-int slbc_sspm_enable(enable)
+int slbc_sspm_enable(int enable)
 {
 	struct slbc_ipi_data slbc_ipi_d;
 
