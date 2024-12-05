@@ -16,3 +16,4 @@ obj-$(CONFIG_NFC_ST54_SPI)		+= st54spi.o
 
 obj-$(CONFIG_NFC_NXP_I2C)		+= nxp-i2c/
 obj-$(CONFIG_NXP_P73_DEVICES)		+= p73-spi/
+obj-y					+= tmsdrv/

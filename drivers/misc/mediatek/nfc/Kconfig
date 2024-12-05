@@ -39,3 +39,4 @@ config NFC_DEBUG
 
 source "drivers/misc/mediatek/nfc/nxp-i2c/Kconfig"
 source "drivers/misc/mediatek/nfc/p73-spi/Kconfig"
+source "drivers/misc/mediatek/nfc/tmsdrv/Kconfig"
