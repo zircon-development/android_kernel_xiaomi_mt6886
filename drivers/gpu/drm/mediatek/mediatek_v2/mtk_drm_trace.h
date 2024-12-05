@@ -54,6 +54,7 @@ void mtk_drm_print_trace(char *fmt, ...);
 void drm_trace_tag_start(const char *tag);
 void drm_trace_tag_end(const char *tag);
 void drm_trace_tag_mark(const char *tag);
+
 void mtk_drm_refresh_tag_start(struct mtk_ddp_comp *ddp_comp);
 void mtk_drm_refresh_tag_end(struct mtk_ddp_comp *ddp_comp);
 void MMPathTraceDRM(struct mtk_ddp_comp *ddp_comp);

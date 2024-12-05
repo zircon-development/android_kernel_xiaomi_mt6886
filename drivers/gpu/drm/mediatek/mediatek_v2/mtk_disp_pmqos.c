@@ -248,6 +248,10 @@ int mtk_disp_hrt_cond_change_cb(struct notifier_block *nb, unsigned long value,
 
 		return 0;
 	}
+	if (drm_crtc_index(&mtk_crtc->base) != 0) {
+		DDP_MUTEX_UNLOCK(&mtk_crtc->lock, __func__, __LINE__);
+		return 0;
+	}
 
 	switch (value) {
 	case BW_THROTTLE_START: /* CAM on */

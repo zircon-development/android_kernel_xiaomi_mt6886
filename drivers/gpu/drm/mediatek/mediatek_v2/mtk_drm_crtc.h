@@ -31,7 +31,9 @@
 #include "mtk_drm_ddp_addon.h"
 #include "mtk_disp_pmqos.h"
 #include "slbc_ops.h"
-
+#ifdef CONFIG_MI_DISP
+#include "mi_disp/mi_disp_esd_check.h"
+#endif
 #define MAX_CRTC 4
 #define OVL_LAYER_NR 12L
 #define OVL_PHY_LAYER_NR 4L
@@ -133,6 +135,7 @@ enum DISP_PMQOS_SLOT {
 	(DISP_SLOT_OVL_RT_LOG_END + 0x14 + (0x8 * (n)))
 #define DISP_SLOT_LAYER_PEAK_RATIO(n)                                          \
 	(DISP_SLOT_LAYER_AVG_RATIO(n) + 0x4)
+
 #define DISP_SLOT_SIZE            \
 	(DISP_SLOT_LAYER_PEAK_RATIO(MAX_FRAME_RATIO_NUMBER*MAX_LAYER_RATIO_NUMBER) + 0x4)
 
@@ -405,6 +408,10 @@ enum MTK_CRTC_PROP {
 	CRTC_PROP_OUTPUT_SCENARIO,
 	CRTC_PROP_CAPS_BLOB_ID,
 	CRTC_PROP_AOSP_CCORR_LINEAR,
+#ifdef CONFIG_MI_DISP_FOD_SYNC
+	/*MI FOD SYNC*/
+	CRTC_PROP_MI_FOD_SYNC_INFO,
+#endif
 	CRTC_PROP_MAX,
 };
 
@@ -717,7 +724,7 @@ struct mtk_cwb_info {
 #define MSYNC_MIN_FPS 46.1
 
 enum MSYNC_RECORD_TYPE {
-	INVALID,
+	INVALID_TYPE,
 	ENABLE_MSYNC,
 	DISABLE_MSYNC,
 	FRAME_TIME,
@@ -949,6 +956,9 @@ struct mtk_drm_crtc {
 
 	bool skip_frame;
 	bool is_dsc_output_swap;
+#ifdef CONFIG_MI_DISP_ESD_CHECK
+	struct mi_esd_ctx *mi_esd_ctx;
+#endif
 
 	bool dsi_null_pkt_postpone;
 };
@@ -1258,4 +1268,11 @@ int mtk_drm_setbacklight(struct drm_crtc *crtc, unsigned int level,
 int mtk_drm_setbacklight_grp(struct drm_crtc *crtc, unsigned int level,
 			unsigned int panel_ext_param, unsigned int cfg_flag);
 void mtk_crtc_update_gce_event(struct mtk_drm_crtc *mtk_crtc);
+void mtk_crtc_cwb_addon_rst(struct drm_crtc *crtc, struct cmdq_pkt *cmdq_handle);
+void mtk_crtc_wb_addon_rst(struct drm_crtc *crtc, struct cmdq_pkt *cmdq_handle);
+void mtk_crtc_lye_addon_module_rst(struct drm_crtc *crtc, struct cmdq_pkt *cmdq_handle);
+void mtk_crtc_addon_connector_rst(struct drm_crtc *crtc, struct cmdq_pkt *cmdq_handle);
+void mtk_crtc_default_path_rst(struct drm_crtc *crtc, struct cmdq_pkt *cmdq_handle);
+void mtk_crtc_rst_module(struct drm_crtc *crtc);
+
 #endif /* MTK_DRM_CRTC_H */

@@ -138,3 +138,25 @@ obj-$(CONFIG_DRM_MEDIATEK_PANEL) += mediatek-drm-panel-drv.o
 obj-$(CONFIG_DRM_MEDIATEK_PANEL) += mediatek-cust-panel-sample.o
 
 ccflags-$(CONFIG_DRM_MEDIATEK_PANEL) += -I$(srctree)/drivers/leds/
+
+ccflags-y += -I$(srctree)/drivers/misc/mediatek/dramc/$(MTK_PLATFORM) \
+             -I$(srctree)/drivers/misc/mediatek/smi/ \
+             -I$(srctree)/drivers/misc/mediatek/mmp/ \
+             -I$(srctree)/drivers/misc/mediatek/mmdvfs/ \
+             -I$(srctree)/drivers/misc/mediatek/pmic/ \
+             -I$(srctree)/drivers/iommu/ \
+             -I$(srctree)/drivers/devfreq/ \
+             -I$(srctree)/drivers/gpu/drm/ \
+             -I$(srctree)/drivers/misc/mediatek/include/mt-plat/$(MTK_PLATFORM)/include/mach/ \
+             -I$(srctree)/drivers/misc/mediatek/include/mt-plat/ \
+             -I$(srctree)/drivers/misc/mediatek/leds/ \
+             -I$(srctree)/drivers/misc/mediatek/leds/$(MTK_PLATFORM) \
+             -I$(srctree)/drivers/misc/mediatek/cmdq/mailbox/ \
+             -I$(srctree)/drivers/misc/mediatek/iommu/ \
+             -I$(srctree)/drivers/misc/mediatek/mtk-interconnect/ \
+             -I$(srctree)/drivers/misc/mediatek/slbc/ \
+             -I$(srctree)/drivers/misc/mediatek/cmdq/mailbox/ \
+             -I$(srctree)/drivers/misc/mediatek/clkbuf/v1/inc/ \
+             -I$(srctree)/drivers/misc/mediatek/scp/include/ \
+             -I$(srctree)/drivers/gpu/drm/mediatek/mediatek_v2/mi_disp/ \
+             -I$(srctree)/drivers/gpu/drm/mediatek/mediatek_v2/ \

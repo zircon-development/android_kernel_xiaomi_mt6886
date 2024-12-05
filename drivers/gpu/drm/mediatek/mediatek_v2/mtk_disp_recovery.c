@@ -330,7 +330,6 @@ static int _mtk_esd_check_eint(struct drm_crtc *crtc)
 	else
 		disable_irq(esd_ctx->eint_irq);
 	atomic_set(&esd_ctx->ext_te_event, 0);
-
 	return ret;
 }
 
@@ -438,6 +437,17 @@ done:
 	return ret;
 }
 
+static atomic_t panel_dead;
+int get_panel_dead_flag(void) {
+	return atomic_read(&panel_dead);
+}
+EXPORT_SYMBOL(get_panel_dead_flag);
+
+void set_panel_dead_flag(int value) {
+	atomic_set(&panel_dead, value);
+}
+EXPORT_SYMBOL(set_panel_dead_flag);
+
 static int mtk_drm_esd_recover(struct drm_crtc *crtc)
 {
 	struct mtk_drm_crtc *mtk_crtc = to_mtk_crtc(crtc);
@@ -447,6 +457,7 @@ static int mtk_drm_esd_recover(struct drm_crtc *crtc)
 	struct mtk_dsi *dsi = NULL;
 	struct cmdq_pkt *cmdq_handle = NULL;
 
+	atomic_set(&panel_dead, 1);
 	CRTC_MMP_EVENT_START(drm_crtc_index(crtc), esd_recovery, 0, 0);
 	if (crtc->state && !crtc->state->active) {
 		DDPMSG("%s: crtc is inactive\n", __func__);
@@ -468,6 +479,8 @@ static int mtk_drm_esd_recover(struct drm_crtc *crtc)
 					      mtk_crtc_is_frame_trigger_mode(crtc) ? true : false);
 		/* flush cmdq with stop_vdo_mode before it set DSI_START to 0 */
 	}
+
+	cmdq_mbox_stop(mtk_crtc->gce_obj.client[CLIENT_CFG]);
 
 	mtk_ddp_comp_io_cmd(output_comp, cmdq_handle, CONNECTOR_PANEL_DISABLE, NULL);
 	if (is_bdg_supported()) {
@@ -498,6 +511,10 @@ static int mtk_drm_esd_recover(struct drm_crtc *crtc)
 
 	CRTC_MMP_MARK(drm_crtc_index(crtc), esd_recovery, 0, 4);
 
+#ifdef CONFIG_MI_DISP_ESD_CHECK
+	mtk_ddp_comp_io_cmd(output_comp, NULL, ESD_RESTORE_BACKLIGHT, NULL);
+#endif
+
 	mtk_crtc_hw_block_ready(crtc);
 	if (mtk_crtc_is_frame_trigger_mode(crtc)) {
 		struct cmdq_pkt *cmdq_handle;
@@ -519,6 +536,7 @@ static int mtk_drm_esd_recover(struct drm_crtc *crtc)
 	CRTC_MMP_MARK(drm_crtc_index(crtc), esd_recovery, 0, 5);
 
 done:
+	atomic_set(&panel_dead, 0);
 	CRTC_MMP_EVENT_END(drm_crtc_index(crtc), esd_recovery, 0, ret);
 
 	return 0;
@@ -533,6 +551,8 @@ int mtk_drm_esd_testing_process(struct mtk_drm_esd_ctx *esd_ctx, bool need_lock)
 		int i = 0;
 		int recovery_flg = 0;
 		unsigned int crtc_idx;
+		u8 panel_dead = 0;
+		struct disp_event event;
 
 		if (!esd_ctx) {
 			DDPPR_ERR("%s invalid ESD context, stop thread\n", __func__);
@@ -570,7 +590,14 @@ int mtk_drm_esd_testing_process(struct mtk_drm_esd_ctx *esd_ctx, bool need_lock)
 
 			DDPPR_ERR("[ESD%u]esd check fail, will do esd recovery. try=%d\n",
 				crtc_idx, i);
+			event.disp_id = MI_DISP_PRIMARY;
+			event.type = MI_DISP_EVENT_PANEL_DEAD;
+			event.length = sizeof(panel_dead);
+			panel_dead = 1;
+			mi_disp_feature_event_notify(&event, &panel_dead);
 			mtk_drm_esd_recover(crtc);
+			panel_dead = 0;
+			mi_disp_feature_event_notify(&event, &panel_dead);
 			recovery_flg = 1;
 		} while (++i < ESD_TRY_CNT);
 

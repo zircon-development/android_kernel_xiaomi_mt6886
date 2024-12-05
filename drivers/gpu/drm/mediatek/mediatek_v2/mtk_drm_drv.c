@@ -78,6 +78,10 @@
 #define CLKBUF_COMMON_H
 #include <mtk_clkbuf_ctl.h>
 
+#ifdef CONFIG_MI_DISP
+#include "mi_disp/mi_disp_feature.h"
+#include "mi_disp/mi_disp_log.h"
+#endif
 #if IS_ENABLED(CONFIG_MTK_DEVINFO)
 #include <linux/nvmem-consumer.h>
 #endif
@@ -884,7 +888,6 @@ static void mtk_atomic_doze_update_dsi_state(struct drm_device *dev,
 			mtk_state->prop_val[CRTC_PROP_DOZE_ACTIVE]);
 }
 	/* TODO: need PQ team's help to fix the following flow that will lead to doze issue.*/
-#ifdef IF_ZERO
 static void pq_bypass_cmdq_cb(struct cmdq_cb_data data)
 {
 	struct mtk_cmdq_cb_data *cb_data = data.data;
@@ -892,11 +895,10 @@ static void pq_bypass_cmdq_cb(struct cmdq_cb_data data)
 	cmdq_pkt_destroy(cb_data->cmdq_handle);
 	kfree(cb_data);
 }
-#endif
+
 static void mtk_atomit_doze_update_pq(struct drm_crtc *crtc, unsigned int stage, bool old_state)
 {
 	/* TODO: need PQ team's help to fix the following flow that will lead to doze issue.*/
-#ifdef IF_ZERO
 	struct mtk_drm_crtc *mtk_crtc = to_mtk_crtc(crtc);
 	struct mtk_crtc_state *mtk_state;
 	struct mtk_ddp_comp *comp;
@@ -907,12 +909,9 @@ static void mtk_atomit_doze_update_pq(struct drm_crtc *crtc, unsigned int stage,
 #ifndef DRM_CMDQ_DISABLE
 	struct cmdq_client *client = mtk_crtc->gce_obj.client[CLIENT_CFG];
 #endif
-#endif
 	/* skip this stage avoid cmdq_mbox control abnormal */
-	return;
 
 	/* TODO: need PQ team's help to fix the following flow that will lead to doze issue.*/
-#ifdef IF_ZERO
 	DDPINFO("%s+: new crtc state = %d, old crtc state = %d, stage = %d\n", __func__,
 		crtc->state->active, old_state, stage);
 	mtk_state = to_mtk_crtc_state(crtc->state);
@@ -958,7 +957,7 @@ static void mtk_atomit_doze_update_pq(struct drm_crtc *crtc, unsigned int stage,
 #endif
 
 	mtk_crtc_pkt_create(&cmdq_handle, &mtk_crtc->base,
-		mtk_crtc->gce_obj.client[CLIENT_CFG]);
+		mtk_crtc->gce_obj.client[CLIENT_DSI_CFG]);
 	cb_data->crtc = crtc;
 	cb_data->cmdq_handle = cmdq_handle;
 
@@ -971,7 +970,9 @@ static void mtk_atomit_doze_update_pq(struct drm_crtc *crtc, unsigned int stage,
 
 	for_each_comp_in_cur_crtc_path(comp, mtk_crtc, i, j) {
 		if (comp && (mtk_ddp_comp_get_type(comp->id) == MTK_DISP_AAL ||
-				mtk_ddp_comp_get_type(comp->id) == MTK_DISP_CCORR)) {
+				mtk_ddp_comp_get_type(comp->id) == MTK_DISP_CCORR || 
+				mtk_ddp_comp_get_type(comp->id) == MTK_DISP_COLOR ||
+				mtk_ddp_comp_get_type(comp->id) == MTK_DMDP_AAL)) {
 			if (comp->funcs && comp->funcs->bypass)
 				mtk_ddp_comp_bypass(comp, bypass, cmdq_handle);
 		}
@@ -980,7 +981,9 @@ static void mtk_atomit_doze_update_pq(struct drm_crtc *crtc, unsigned int stage,
 	if (mtk_crtc->is_dual_pipe) {
 		for_each_comp_in_dual_pipe(comp, mtk_crtc, i, j) {
 			if (comp && (mtk_ddp_comp_get_type(comp->id) == MTK_DISP_AAL ||
-				mtk_ddp_comp_get_type(comp->id) == MTK_DISP_CCORR)) {
+				mtk_ddp_comp_get_type(comp->id) == MTK_DISP_CCORR ||
+				mtk_ddp_comp_get_type(comp->id) == MTK_DISP_COLOR ||
+				mtk_ddp_comp_get_type(comp->id) == MTK_DMDP_AAL)) {
 				if (comp->funcs && comp->funcs->bypass)
 					mtk_ddp_comp_bypass(comp, bypass, cmdq_handle);
 			}
@@ -993,7 +996,6 @@ static void mtk_atomit_doze_update_pq(struct drm_crtc *crtc, unsigned int stage,
 #ifndef DRM_CMDQ_DISABLE
 	if (bypass)
 		cmdq_mbox_disable(client->chan); /* GCE clk refcnt - 1 */
-#endif
 #endif
 }
 
@@ -1556,8 +1558,8 @@ static int mtk_atomic_check(struct drm_device *dev,
 		old_state = to_mtk_crtc_state(crtc->state);
 		new_state = to_mtk_crtc_state(crtc_state);
 
-		if (drm_crtc_index(crtc) == 0)
-			mtk_drm_crtc_mode_check(crtc, crtc->state, crtc_state);
+ 		if (drm_crtc_index(crtc) == 0)
+ 			mtk_drm_crtc_mode_check(crtc, crtc->state, crtc_state);
 
 		if (old_state->prop_val[CRTC_PROP_DOZE_ACTIVE] ==
 		    new_state->prop_val[CRTC_PROP_DOZE_ACTIVE])
@@ -4876,7 +4878,7 @@ int mtk_drm_get_display_caps_ioctl(struct drm_device *dev, void *data,
 	caps_info->lcm_degree = 180;
 #endif
 
-	caps_info->lcm_color_mode = MTK_DRM_COLOR_MODE_NATIVE;
+	caps_info->lcm_color_mode = MTK_DRM_COLOR_MODE_DISPLAY_P3;
 	if (mtk_drm_helper_get_opt(private->helper_opt, MTK_DRM_OPT_OVL_WCG)) {
 		if (params)
 			caps_info->lcm_color_mode = params->lcm_color_mode;
@@ -7434,7 +7436,6 @@ SKIP_OVLSYS_CONFIG:
 				node->full_name);
 			continue;
 		}
-
 		comp_type = (enum mtk_ddp_comp_type)of_id->data;
 
 		if (comp_type == MTK_DISP_MUTEX) {
@@ -7767,6 +7768,11 @@ static int __init mtk_drm_init(void)
 	int i;
 
 	DDPINFO("%s+\n", __func__);
+
+#ifdef CONFIG_MI_DISP
+	mi_disp_feature_init();
+#endif
+
 	for (i = 0; i < ARRAY_SIZE(mtk_drm_drivers); i++) {
 		DDPINFO("%s register %s driver\n",
 			__func__, mtk_drm_drivers[i]->driver.name);
