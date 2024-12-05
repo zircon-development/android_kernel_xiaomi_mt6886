@@ -141,7 +141,8 @@ enum {
 	TCP_NOTIFY_TYPEC_OTP,
 	TCP_NOTIFY_PLUG_OUT,
 	TCP_NOTIFY_WD0_STATE,
-	TCP_NOTIFY_MISC_END = TCP_NOTIFY_WD0_STATE,
+	TCP_NOTIFY_SOFT_RESET,
+	TCP_NOTIFY_MISC_END = TCP_NOTIFY_SOFT_RESET,
 };
 
 struct tcp_ny_pd_state {
@@ -913,6 +914,9 @@ extern uint8_t tcpm_inquire_pd_data_role(
 extern uint8_t tcpm_inquire_pd_power_role(
 	struct tcpc_device *tcpc);
 
+extern uint8_t tcpm_inquire_pd_state_curr(
+	struct tcpc_device *tcpc_dev);
+
 extern uint8_t tcpm_inquire_pd_vconn_role(
 	struct tcpc_device *tcpc);
 
@@ -1426,6 +1430,12 @@ static inline uint8_t tcpm_inquire_pd_data_role(
 
 static inline uint8_t tcpm_inquire_pd_power_role(
 	struct tcpc_device *tcpc)
+{
+	return 0;
+}
+
+static inline uint8_t tcpm_inquire_pd_state_curr(
+	struct tcpc_device *tcpc_dev)
 {
 	return 0;
 }
