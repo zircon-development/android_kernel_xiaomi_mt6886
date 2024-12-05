@@ -98,6 +98,7 @@ obj-$(CONFIG_MTK_GATE_IC) += gate_ic/
 obj-$(CONFIG_USB) += usb/
 obj-$(CONFIG_MTK_WIDEVINE_DRM) += widevine_drm/
 obj-$(CONFIG_MTK_MT6382_BDG) += spi_slave_drv/
+obj-$(CONFIG_MI_CAMLOG) += cam_log/
 
 subdir-ccflags-y += -D__XIAOMI_CAMERA__
 ifeq ($(CONFIG_BUILD_XIAOMI_CAMERA_IMAGE_NAMES),"zircon")
