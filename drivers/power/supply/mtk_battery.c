@@ -813,7 +813,7 @@ static int battery_psy_get_property(struct power_supply *psy,
 		val->intval = charger_manager_get_sic_current();
 		break;
 	case POWER_SUPPLY_PROP_MODEL_NAME:
-		val->strval = "M12_5000mah_120w";
+		val->strval = "N16U_5000mah_120w";
 		break;
 	default:
 		ret = -EINVAL;
