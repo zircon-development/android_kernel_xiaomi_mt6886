@@ -906,6 +906,12 @@ config MTK_CHARGER
 	  maintains charging status.
 	  Say no if not using MediaTek charging driver.
 
+config XMEXT_TI_GAUGE
+	tristate "xmext use bq28z601 gauge"
+	help
+	  Say yes here to enable xmext use bq28z601 gauge driver.
+	  Say no if not using xmext use bq28z601 gauge driver.
+
 config MTK_PUMP_EXPRESS_PLUS_SUPPORT
 	tristate "MediaTek PUMP EXPRESS PLUS"
 	depends on MTK_CHARGER

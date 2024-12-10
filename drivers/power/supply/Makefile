@@ -135,6 +135,7 @@ obj-$(CONFIG_MTK_PUMP_EXPRESS_50_PLUS_SUPPORT) += mtk_pep50p.o
 mtk_pep50p-objs := mtk_pe5p.o mtk_pe5p_hal.o
 obj-$(CONFIG_MTK_HVBP_SUPPORT) += mtk_hvbpc.o
 mtk_hvbpc-objs := mtk_hvbp.o mtk_hvbp_hal.o
+obj-$(CONFIG_XMEXT_TI_GAUGE) += bq28z610.o
 
 obj-$(CONFIG_BATTERY_ACER_A500)	+= acer_a500_battery.o
 obj-$(CONFIG_BATTERY_SURFACE)	+= surface_battery.o
