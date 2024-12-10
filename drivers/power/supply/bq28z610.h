@@ -195,6 +195,12 @@ struct bq_fg_batt_supplier {
 	const char letter;
 	enum bq_fg_batt_supplier_field fd;
 };
+
+struct bq_fg_batt_adapting_power {
+	int power;
+	const char letter;
+};
+
 struct bq_fg_chip {
 	struct device *dev;
 	struct i2c_client *client;
@@ -303,6 +309,7 @@ enum bms_property {
 	BMS_PROP_ISC_ALERT_LEVEL,
 	BMS_PROP_SOA_ALERT_LEVEL,
 	BMS_PROP_BATTERY_SUPPLIER,
+	BMS_PROP_ADAPTING_POWER,
 };
 
 struct mtk_bms_sysfs_field_info {

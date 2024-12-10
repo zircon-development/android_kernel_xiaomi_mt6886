@@ -1512,6 +1512,21 @@ int battery_supplier_get(struct bq_fg_chip *gm,
 
 	return ret;
 }
+
+int adapting_power_get(struct bq_fg_chip *gm,
+		       struct mtk_bms_sysfs_field_info *attr, int *val)
+{
+	int ret = 0;
+	if (gm)
+		*val = gm->adapting_power;
+	else {
+		*val = 10;
+		ret = -1;
+	}
+
+	return ret;
+}
+
 /* Must be in the same order as BMS_PROP_* */
 static struct mtk_bms_sysfs_field_info bms_sysfs_field_tbl[] = {
 	BMS_SYSFS_FIELD_RW(fastcharge_mode, BMS_PROP_FASTCHARGE_MODE),
@@ -1536,6 +1551,7 @@ static struct mtk_bms_sysfs_field_info bms_sysfs_field_tbl[] = {
 	BMS_SYSFS_FIELD_RO(isc_alert_level, BMS_PROP_ISC_ALERT_LEVEL),
 	BMS_SYSFS_FIELD_RO(soa_alert_level, BMS_PROP_SOA_ALERT_LEVEL),
 	BMS_SYSFS_FIELD_RO(battery_supplier, BMS_PROP_BATTERY_SUPPLIER),
+	BMS_SYSFS_FIELD_RO(adapting_power, BMS_PROP_ADAPTING_POWER),
 };
 
 int bms_get_property(enum bms_property bp, int *val)
