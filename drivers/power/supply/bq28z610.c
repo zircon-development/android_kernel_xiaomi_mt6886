@@ -37,6 +37,20 @@
 static int product_name = UNKNOWN;
 static int log_level = 1;
 
+static struct bq_fg_batt_supplier battery_supplier[] = {
+	{ .fd = BATTERY_SUPPLIER_BYD, .name = "BYD", .letter = 'B' },
+	{ .fd = BATTERY_SUPPLIER_COSLIGHT, .name = "COSLIGHT", .letter = 'C' },
+	{ .fd = BATTERY_SUPPLIER_SUNWODA, .name = "SUNWODA", .letter = 'S' },
+	{ .fd = BATTERY_SUPPLIER_NVT, .name = "NVT", .letter = 'N' },
+	{ .fd = BATTERY_SUPPLIER_SCUD, .name = "SCUD", .letter = 'U' },
+	{ .fd = BATTERY_SUPPLIER_TWS, .name = "TWS", .letter = 'T' },
+	{ .fd = BATTERY_SUPPLIER_LISHEN, .name = "LISHEN", .letter = 'I' },
+	{ .fd = BATTERY_SUPPLIER_DESAY, .name = "DESAY", .letter = 'K' },
+	{ .fd = BATTERY_SUPPLIER_MAX_NUM,
+	  .name = "UNKNOWN supplier",
+	  .letter = '\0' },
+};
+
 #define fg_err(fmt, ...)                                                       \
 	do {                                                                   \
 		if (log_level >= 0)                                            \
@@ -1459,6 +1473,19 @@ int soa_alert_level_get(struct bq_fg_chip *gm,
 	return ret;
 }
 
+int battery_supplier_get(struct bq_fg_chip *gm,
+			 struct mtk_bms_sysfs_field_info *attr, int *val)
+{
+	int ret = 0;
+	if (gm)
+		*val = gm->battery_supplier_fd;
+	else {
+		*val = BATTERY_SUPPLIER_MAX_NUM;
+		ret = -1;
+	}
+
+	return ret;
+}
 /* Must be in the same order as BMS_PROP_* */
 static struct mtk_bms_sysfs_field_info bms_sysfs_field_tbl[] = {
 	BMS_SYSFS_FIELD_RW(fastcharge_mode, BMS_PROP_FASTCHARGE_MODE),
@@ -1482,6 +1509,7 @@ static struct mtk_bms_sysfs_field_info bms_sysfs_field_tbl[] = {
 	BMS_SYSFS_FIELD_RO(time_ot, BMS_PROP_TIME_OT),
 	BMS_SYSFS_FIELD_RO(isc_alert_level, BMS_PROP_ISC_ALERT_LEVEL),
 	BMS_SYSFS_FIELD_RO(soa_alert_level, BMS_PROP_SOA_ALERT_LEVEL),
+	BMS_SYSFS_FIELD_RO(battery_supplier, BMS_PROP_BATTERY_SUPPLIER),
 };
 
 int bms_get_property(enum bms_property bp, int *val)
@@ -2080,6 +2108,34 @@ static int enable_FG_I2CMOS(struct bq_fg_chip *bq, int en)
 
 	return ret;
 }
+
+static int fg_check_batt_supplier(struct bq_fg_chip *bq)
+{
+	u8 data[5] = {
+		0,
+	};
+	int ret = 0, i = 0;
+	int try_count = 0;
+
+	while (try_count++ <= 5) {
+		ret = fg_mac_read_block(bq, FG_MAC_CMD_DEVICE_CHEM, data, 5);
+		if (ret) {
+			continue;
+		}
+
+		for (i = 0; i < ARRAY_SIZE(battery_supplier) - 1; i++) {
+			if (data[2] == battery_supplier[i].letter) {
+				bq->battery_supplier_fd =
+					battery_supplier[i].fd;
+				return true;
+			}
+		}
+		return false;
+	}
+
+	return false;
+}
+
 static int fg_check_device(struct bq_fg_chip *bq)
 {
 	u8 data[32];
@@ -2223,6 +2279,11 @@ static int fg_probe(struct i2c_client *client, const struct i2c_device_id *id)
 		if (ret < 0)
 			fg_err("%s: Failed to enable FG I2C MOS, FG I2C may NOT work!\n",
 			       __func__);
+
+		ret = fg_check_batt_supplier(bq);
+		if (ret < 0)
+			fg_err("%s Check battery supplier Failed!\n",
+			       bq->log_tag);
 	}
 
 	fg_check_device(bq);

@@ -178,6 +178,23 @@ enum bq_fg_mac_cmd {
 	FG_MAC_CMD_RA_TABLE = 0x40C0,
 };
 
+enum bq_fg_batt_supplier_field {
+	BATTERY_SUPPLIER_BYD,
+	BATTERY_SUPPLIER_COSLIGHT,
+	BATTERY_SUPPLIER_SUNWODA,
+	BATTERY_SUPPLIER_NVT,
+	BATTERY_SUPPLIER_SCUD,
+	BATTERY_SUPPLIER_TWS,
+	BATTERY_SUPPLIER_LISHEN,
+	BATTERY_SUPPLIER_DESAY,
+	BATTERY_SUPPLIER_MAX_NUM,
+};
+
+struct bq_fg_batt_supplier {
+	const char *name;
+	const char letter;
+	enum bq_fg_batt_supplier_field fd;
+};
 struct bq_fg_chip {
 	struct device *dev;
 	struct i2c_client *client;
@@ -245,6 +262,7 @@ struct bq_fg_chip {
 	bool real_full;
 
 	struct regulator *fg_mos_control;
+	enum bq_fg_batt_supplier_field battery_supplier_fd;
 };
 
 #define BMS_SYSFS_FIELD_RW(_name, _prop)                                       \
@@ -282,6 +300,7 @@ enum bms_property {
 	BMS_PROP_TIME_OT,
 	BMS_PROP_ISC_ALERT_LEVEL,
 	BMS_PROP_SOA_ALERT_LEVEL,
+	BMS_PROP_BATTERY_SUPPLIER,
 };
 
 struct mtk_bms_sysfs_field_info {
