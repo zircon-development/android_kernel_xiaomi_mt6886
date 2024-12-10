@@ -4746,6 +4746,16 @@ static int source_jeita_fcc_get(struct mtk_charger *gm,
 	return 0;
 }
 
+static int real_full_get(struct mtk_charger *gm,
+			 struct mtk_usb_sysfs_field_info *attr, int *val)
+{
+	if (gm)
+		*val = gm->real_full;
+	else
+		*val = -1;
+	return 0;
+}
+
 static const char * const power_supply_typec_mode_text[] = {
 	"Nothing attached", "Sink attached", "Powered cable w/ sink",
 	"Debug Accessory", "Audio Adapter", "Powered cable w/o sink",
@@ -4871,6 +4881,7 @@ static struct mtk_usb_sysfs_field_info usb_sysfs_field_tbl[] = {
 	USB_SYSFS_FIELD_RO(div_jeita_fcc_flag, USB_PROP_DIV_JEITA_FCC_FLAG),
 	USB_SYSFS_FIELD_RO(jeita_chg_fcc, USB_PROP_JEITA_CHG_FCC),
 	USB_SYSFS_FIELD_RO(source_jeita_fcc, USB_PROP_SOURCE_JEITA_CHG_FCC),
+	USB_SYSFS_FIELD_RO(real_full, USB_PROP_REAL_FULL),
 };
 
 int usb_get_property(enum usb_property bp,

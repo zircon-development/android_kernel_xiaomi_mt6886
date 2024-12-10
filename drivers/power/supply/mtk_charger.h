@@ -427,6 +427,7 @@ struct mtk_charger {
 	bool pd_verifying;
 	bool fg_full;
 	bool charge_full;
+	bool real_full;
 	bool bbc_charge_done;
 	bool bbc_charge_enable;
 	bool recharge;
@@ -666,6 +667,7 @@ enum usb_property {
 	USB_PROP_DIV_JEITA_FCC_FLAG,
 	USB_PROP_JEITA_CHG_FCC,
 	USB_PROP_SOURCE_JEITA_CHG_FCC,
+	USB_PROP_REAL_FULL,
 };
 
 struct mtk_usb_sysfs_field_info {

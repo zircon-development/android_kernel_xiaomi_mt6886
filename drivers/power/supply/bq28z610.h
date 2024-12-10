@@ -242,6 +242,7 @@ struct bq_fg_chip {
 	bool enable_shutdown_delay;
 	bool shutdown_flag;
 	bool shutdown_mode;
+	bool real_full;
 
 	struct regulator *fg_mos_control;
 };
