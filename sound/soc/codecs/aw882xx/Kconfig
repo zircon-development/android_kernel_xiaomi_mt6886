@@ -1,0 +1,17 @@
+config SND_SMARTPA_AW882XX
+	tristate "SoC Audio for awinic AW882XX series"
+	depends on I2C
+	help
+	  This option enables support for the awinic AW882XX series of smart
+	  amplifiers. These devices are used for audio processing and sound
+	  amplification in various SoC platforms, communicating via the I2C
+	  interface.
+
+config SND_SMARTPA_AW882XX_GPIO_CONFIG
+	tristate "SoC Audio for awinic AW882XX series GPIO reset config"
+	depends on I2C
+	help
+	  This option adds support for configuring the reset GPIO pin of the
+	  awinic AW882XX series smart amplifiers. The reset GPIO is typically
+	  used to initialize or reset the device as part of the driver
+	  operation.
