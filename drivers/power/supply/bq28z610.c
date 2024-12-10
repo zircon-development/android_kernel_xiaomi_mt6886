@@ -1008,6 +1008,30 @@ static bool battery_get_psy(struct bq_fg_chip *bq)
 	return true;
 }
 
+static bool fg_get_usb_psy_and_prop(struct bq_fg_chip *bq)
+{
+	struct mtk_charger *info;
+
+	if (!bq->usb_psy) {
+		bq->usb_psy = power_supply_get_by_name("usb");
+		if (!bq->usb_psy) {
+			fg_err("%s failed to get usb psy", bq->log_tag);
+			return false;
+		}
+	}
+
+	info = power_supply_get_drvdata(bq->usb_psy);
+
+	if (!info) {
+		fg_err("%s failed to get drvdata of usb psy", bq->log_tag);
+	} else {
+		bq->real_type = info->real_type;
+		bq->real_full = info->real_full;
+	}
+
+	return true;
+}
+
 static void fg_update_status(struct bq_fg_chip *bq)
 {
 	int temp_soc = 0, delta_temp = 0;
@@ -1025,6 +1049,8 @@ static void fg_update_status(struct bq_fg_chip *bq)
 	mutex_unlock(&bq->data_lock);
 	fg_err("%s fg_update rsoc=%d, raw_soc=%d, vbat=%d, cycle_count=%d\n",
 	       __func__, bq->rsoc, bq->raw_soc, bq->vbat, bq->cycle_count);
+
+	fg_get_usb_psy_and_prop(bq);
 
 	if (!battery_get_psy(bq)) {
 		fg_err("%s fg_update failed to get battery psy\n", bq->log_tag);

@@ -238,6 +238,7 @@ struct bq_fg_chip {
 	struct delayed_work monitor_work;
 	struct power_supply *fg_psy;
 	struct power_supply *batt_psy;
+	struct power_supply *usb_psy;
 	struct power_supply_desc fg_psy_d;
 
 	u8 digest[RANDOM_CHALLENGE_LEN_MAX];
@@ -260,6 +261,7 @@ struct bq_fg_chip {
 	bool shutdown_flag;
 	bool shutdown_mode;
 	bool real_full;
+	int real_type;
 
 	struct regulator *fg_mos_control;
 	enum bq_fg_batt_supplier_field battery_supplier_fd;
