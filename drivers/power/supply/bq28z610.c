@@ -31,7 +31,9 @@
 #include <linux/ktime.h>
 #include <../drivers/misc/hwid/hwid.h>
 #include <linux/regulator/driver.h>
+#include <linux/reboot.h>
 #include "bq28z610.h"
+#include "mtk_charger.h"
 #include "mtk_battery.h"
 
 static int product_name = UNKNOWN;
@@ -822,7 +824,7 @@ static int fg_set_fastcharge_mode(struct bq_fg_chip *bq, bool enable)
 	return ret;
 }
 
-static int calc_delta_time(ktime_t time_last, int *delta_time)
+static int calc_delta_time(ktime_t time_last, s64 *delta_time)
 {
 	ktime_t time_now;
 
@@ -860,13 +862,67 @@ struct ffc_smooth ffc_dischg_smooth[FFC_SMOOTH_LEN] = {
 	{ 1000, 50000 },
 };
 
+#if defined(AGED_BATTERY_FORCE_SMOOTH)
+#define CURR_QUEUE_SIZE 30
+// static struct fv_limit_smooth_config fv_dischg_smooth_new[FFC_SMOOTH_LEN] = {
+// 	{0,         0},
+// 	{3400000,   10},
+// 	{3500000,   20},
+// 	{3600000,   30},
+// };
+
+struct curr_queue {
+	int curr_data[CURR_QUEUE_SIZE];
+	int front;
+	int tail;
+	int empty;
+};
+struct curr_queue curr_arr_queue = { .front = 0, .tail = 0, .empty = 1 };
+int enqueue(struct curr_queue *, int curr_data);
+int dequeue(struct curr_queue *);
+
+int enqueue(struct curr_queue *q, int curr_data)
+{
+	if (!q->empty && q->front == q->tail) {
+		return -1;
+	}
+	q->empty = 0;
+	q->curr_data[q->tail] = curr_data;
+	q->tail = (q->tail + 1) % CURR_QUEUE_SIZE;
+	return 0;
+}
+
+int dequeue(struct curr_queue *q)
+{
+	int curr_data = 0;
+	if (q->empty)
+		return -1;
+
+	curr_data = q->curr_data[q->front];
+	q->front = (q->front + 1) % CURR_QUEUE_SIZE;
+	if (q->front == q->tail)
+		q->empty = 1;
+	return curr_data;
+}
+
+enum strong_smooth_status {
+	NO_STRONG_SMOOTH = 0,
+	STRONG_SMOOTH_DOING,
+	STRONG_SMOOTH_TAKE_EFFECT,
+};
+
+#define SLOW_DOWN_THRESHOLD_AFTER_STRONG_SMOOTH 80
+static u16 fg_check_stop_charging_status(struct bq_fg_chip *bq,
+					 s32 system_soc_now);
+#endif
+
 static int bq_battery_soc_smooth_tracking_new(struct bq_fg_chip *bq,
 					      int raw_soc, int batt_soc)
 {
 	static int system_soc, last_system_soc;
 	int soc_changed = 0, unit_time = 4000, delta_time = 0, soc_delta = 0;
 	static ktime_t last_change_time = -1;
-	int change_delta = 0;
+	s64 change_delta = 0;
 	int rc, charging_status, i = 0, batt_ma_avg = 0;
 	union power_supply_propval pval = {
 		0,
@@ -968,7 +1024,6 @@ static int bq_battery_soc_smooth_tracking_new(struct bq_fg_chip *bq,
 
 	if ((system_soc == 0) && (bq->vbat >= 3400) && (time.tv_sec <= 30)) {
 		system_soc = 1;
-		fg_err("uisoc::hold 1 when volt > 3400mv. \n");
 	}
 
 	if (bq->last_soc != system_soc) {
@@ -976,6 +1031,219 @@ static int bq_battery_soc_smooth_tracking_new(struct bq_fg_chip *bq,
 	}
 	return system_soc;
 }
+
+static int
+bq_battery_soc_smooth_tracking_new_batt_health_30(struct bq_fg_chip *bq,
+						  int raw_soc, int batt_soc)
+{
+	static int system_soc, last_system_soc;
+	int soc_changed = 0, unit_time = 4000, delta_time = 0, soc_delta = 0;
+	static ktime_t last_change_time = -1;
+	s64 change_delta = 0;
+	int rc, charging_status, i = 0, batt_ma_avg = 0;
+	union power_supply_propval pval = {
+		0,
+	};
+	struct timespec64 time;
+	ktime_t tmp_time = 0;
+#if defined(AGED_BATTERY_FORCE_SMOOTH)
+
+	if (bq->strong_smooth > NO_STRONG_SMOOTH) {
+		goto strong_smooth_out;
+	}
+#endif
+
+	tmp_time = ktime_get_boottime();
+	time = ktime_to_timespec64(tmp_time);
+
+	rc = power_supply_get_property(bq->batt_psy, POWER_SUPPLY_PROP_STATUS,
+				       &pval);
+	if (rc < 0) {
+		return -EINVAL;
+	}
+	charging_status = pval.intval;
+	if (bq->tbat < 150) {
+		bq->monitor_delay = FG_MONITOR_DELAY_3S;
+	}
+	if (raw_soc >= bq->report_full_rsoc)
+		system_soc = 100;
+	else if (bq->max_chg_power_120w) {
+		system_soc = ((raw_soc + 94) / 95);
+		if (system_soc > 99)
+			system_soc = 99;
+	} else {
+		system_soc = ((raw_soc + 97) / 98);
+		if (system_soc > 99)
+			system_soc = 99;
+	}
+	if (last_change_time == -1) {
+		last_change_time = ktime_get();
+		if (system_soc != 0)
+			last_system_soc = system_soc;
+		else
+			last_system_soc = batt_soc;
+	}
+	if ((charging_status == POWER_SUPPLY_STATUS_DISCHARGING ||
+	     charging_status == POWER_SUPPLY_STATUS_NOT_CHARGING) &&
+	    !bq->rm && bq->tbat < 150 && last_system_soc >= 1) {
+		batt_ma_avg = fg_read_avg_current(bq);
+		for (i = FFC_SMOOTH_LEN - 1; i >= 0; i--) {
+			if (batt_ma_avg > ffc_dischg_smooth[i].curr_lim) {
+				unit_time = ffc_dischg_smooth[i].time;
+				break;
+			}
+		}
+	}
+	soc_delta = abs(system_soc - last_system_soc);
+#if defined(AGED_BATTERY_FORCE_SMOOTH)
+	if ((soc_delta <= 1 ||
+	     last_system_soc <= SLOW_DOWN_THRESHOLD_AFTER_STRONG_SMOOTH) &&
+	    bq->smooth_slow_down == true)
+		bq->smooth_slow_down = false;
+#endif
+
+	if (soc_delta > 1 || (bq->vbat < 3300 && system_soc > 0) ||
+	    (unit_time != 4000 && soc_delta == 1)) {
+#if defined(AGED_BATTERY_FORCE_SMOOTH)
+		if (bq->smooth_slow_down == true) {
+			if (batt_ma_avg >= BATT_HIGH_AVG_CURRENT)
+				unit_time = 30000;
+			else
+				unit_time = 60000;
+		}
+#endif
+		calc_delta_time(last_change_time, &change_delta);
+		delta_time = change_delta / unit_time;
+		if (delta_time < 0) {
+			last_change_time = ktime_get();
+			delta_time = 0;
+		}
+		soc_changed = min(1, delta_time);
+		if (soc_changed) {
+			if (charging_status == POWER_SUPPLY_STATUS_CHARGING &&
+			    system_soc > last_system_soc)
+				system_soc = last_system_soc + soc_changed;
+			else if ((charging_status ==
+					  POWER_SUPPLY_STATUS_DISCHARGING ||
+				  charging_status ==
+					  POWER_SUPPLY_STATUS_CHARGING) &&
+				 system_soc < last_system_soc)
+				system_soc = last_system_soc - soc_changed;
+		} else
+			system_soc = last_system_soc;
+	}
+
+	if ((charging_status == POWER_SUPPLY_STATUS_DISCHARGING) &&
+	    (system_soc > last_system_soc))
+		system_soc = last_system_soc;
+
+#if defined(AGED_BATTERY_FORCE_SMOOTH)
+strong_smooth_out:
+	bq->strong_smooth = fg_check_stop_charging_status(bq, system_soc);
+
+	if (bq->strong_smooth == STRONG_SMOOTH_TAKE_EFFECT) {
+		bq->smooth_slow_down = true;
+		system_soc++;
+	}
+#endif
+
+	if (system_soc != last_system_soc) {
+		last_change_time = ktime_get();
+		last_system_soc = system_soc;
+	}
+	if (system_soc > 100)
+		system_soc = 100;
+	if (system_soc < 0)
+		system_soc = 0;
+
+	if ((system_soc == 0) && (bq->vbat >= 3400) && (time.tv_sec <= 30)) {
+		system_soc = 1;
+		fg_err("uisoc::hold 1 when volt > 3400mv. \n");
+	}
+
+	if (bq->real_full && bq->rsoc > bq->report_full_rsoc - 1)
+		system_soc = 100;
+
+	if (bq->last_soc != system_soc) {
+		bq->last_soc = system_soc;
+	}
+	return system_soc;
+}
+
+#if defined(AGED_BATTERY_FORCE_SMOOTH)
+static u16 fg_check_stop_charging_status(struct bq_fg_chip *bq,
+					 s32 system_soc_now)
+{
+	static ktime_t last_update_time = -1;
+	s64 delta_time = 0;
+	static s32 system_soc_last = -1;
+	int curr = 0, temp = 0, rsoc = 0;
+	union power_supply_propval pval = {
+		0,
+	};
+	int is_charger_exist;
+	int ret = 0;
+	u16 strong_smooth = 0;
+	static int queuecount = 0;
+	static int curr_sum = 0;
+	int curr_arrage = 0;
+	int dequeue_curr = 0;
+	int result = 0;
+	curr = bq->ibat;
+	temp = bq->tbat;
+	rsoc = bq->rsoc;
+	strong_smooth = bq->strong_smooth;
+	if (bq->usb_psy)
+		ret = power_supply_get_property(
+			bq->usb_psy, POWER_SUPPLY_PROP_ONLINE, &pval);
+	is_charger_exist = pval.intval;
+	if (!is_charger_exist || system_soc_now <= 92 || temp > 470 ||
+	    temp < 150 || rsoc < 75) {
+		if (!is_charger_exist) {
+			last_update_time = ktime_get();
+		}
+		return NO_STRONG_SMOOTH;
+	}
+	if (!(bq->real_type == XMUSB350_TYPE_PD ||
+	      bq->real_type == XMUSB350_TYPE_HVCHG)) {
+		return NO_STRONG_SMOOTH;
+	}
+	if (system_soc_now >= 100 && strong_smooth == NO_STRONG_SMOOTH) {
+		return NO_STRONG_SMOOTH;
+	}
+	if (system_soc_last != system_soc_now) {
+		if (system_soc_now > system_soc_last)
+			last_update_time = ktime_get();
+		system_soc_last = system_soc_now;
+		if (strong_smooth == NO_STRONG_SMOOTH)
+			return NO_STRONG_SMOOTH;
+	}
+	queuecount++;
+	result = enqueue(&curr_arr_queue, curr);
+	curr_sum += curr;
+	if (queuecount > 20) {
+		dequeue_curr = dequeue(&curr_arr_queue);
+		queuecount--;
+		curr_sum -= dequeue_curr;
+	}
+	curr_arrage = curr_sum / queuecount;
+	if (curr_arrage < 0 || curr_arrage > 600) {
+		return NO_STRONG_SMOOTH;
+	}
+	calc_delta_time(last_update_time, &delta_time);
+	if ((delta_time > 8 * 60 * 1000 && strong_smooth == NO_STRONG_SMOOTH)) {
+		return STRONG_SMOOTH_TAKE_EFFECT;
+	}
+	if (strong_smooth > NO_STRONG_SMOOTH && delta_time > 1 * 60 * 1000 &&
+	    system_soc_now < 101) {
+		return STRONG_SMOOTH_TAKE_EFFECT;
+	}
+	if (strong_smooth > NO_STRONG_SMOOTH)
+		return STRONG_SMOOTH_DOING;
+	else
+		return NO_STRONG_SMOOTH;
+}
+#endif
 
 static int fg_set_shutdown_mode(struct bq_fg_chip *bq)
 {
@@ -1068,8 +1336,14 @@ static void fg_update_status(struct bq_fg_chip *bq)
 		}
 		return;
 	} else {
-		bq->ui_soc = bq_battery_soc_smooth_tracking_new(bq, bq->raw_soc,
-								bq->rsoc);
+		if (product_name == ZIRCON)
+			bq->ui_soc =
+				bq_battery_soc_smooth_tracking_new_batt_health_30(
+					bq, bq->raw_soc, bq->rsoc);
+		else
+			bq->ui_soc = bq_battery_soc_smooth_tracking_new(
+				bq, bq->raw_soc, bq->rsoc);
+
 		fg_info("%s [FG_STATUS] [UISOC RSOC RAWSOC TEMP_SOC SOH] = [%d %d %d %d %d], [VBAT CELL0 CELL1 IBAT TBAT FC FAST_MODE] = [%d %d %d %d %d %d %d], [RM FCC qmax0 qmax1]=[%d %d]\n",
 			bq->log_tag, bq->ui_soc, bq->rsoc, bq->raw_soc,
 			temp_soc, bq->soh, bq->vbat, bq->cell_voltage[0],

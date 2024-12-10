@@ -26,6 +26,8 @@
 #include <linux/kernel.h>
 #include <linux/i2c.h>
 
+#define AGED_BATTERY_FORCE_SMOOTH 1
+
 #define RANDOM_CHALLENGE_LEN_MAX 32
 #define RANDOM_CHALLENGE_LEN_BQ27Z561 32
 #define RANDOM_CHALLENGE_LEN_BQ28Z610 20
@@ -271,6 +273,11 @@ struct bq_fg_chip {
 
 	struct regulator *fg_mos_control;
 	enum bq_fg_batt_supplier_field battery_supplier_fd;
+
+#if defined(AGED_BATTERY_FORCE_SMOOTH)
+	u16 strong_smooth;
+	bool smooth_slow_down;
+#endif
 };
 
 #define BMS_SYSFS_FIELD_RW(_name, _prop)                                       \
