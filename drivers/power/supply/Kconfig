@@ -861,7 +861,7 @@ config GAUGE_MT6375
 	  according to battery open circuit voltage.
 
 config GAUGE_BQ28Z610
-	tristate " TI BQ28Z610 gauge support"
+	tristate "TI BQ28Z610 gauge support"
 	depends on I2C
 	help
 	  Say Y here to enable support for TI BQ28Z610 gauge.
