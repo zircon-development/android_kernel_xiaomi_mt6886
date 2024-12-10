@@ -32,7 +32,9 @@
 #include <../drivers/misc/hwid/hwid.h>
 #include <linux/regulator/driver.h>
 #include "bq28z610.h"
+#include "mtk_battery.h"
 
+static int product_name = UNKNOWN;
 static int log_level = 1;
 
 #define fg_err(fmt, ...)                                                       \
@@ -52,6 +54,19 @@ static int log_level = 1;
 		if (log_level >= 2)                                            \
 			printk(KERN_ERR "[XMCHG] " fmt, ##__VA_ARGS__);        \
 	} while (0)
+
+static void charger_parse_cmdline(void)
+{
+	char *zircon_match =
+		strnstr(product_name_get(), "zircon", strlen("zircon"));
+	char *corot_match =
+		strnstr(product_name_get(), "corot", strlen("corot"));
+
+	if (zircon_match)
+		product_name = ZIRCON;
+	else if (corot_match)
+		product_name = COROT;
+}
 
 static int __fg_write_byte(struct i2c_client *client, u8 reg, u8 val)
 {
@@ -2043,6 +2058,28 @@ static int fg_parse_dt(struct bq_fg_chip *bq)
 	return ret;
 }
 
+static int enable_FG_I2CMOS(struct bq_fg_chip *bq, int en)
+{
+	int ret = 0;
+	int vbus_vol = 3000000;
+	struct regulator *mos_control = bq->fg_mos_control;
+	struct device *dev = bq->dev;
+
+	mos_control = devm_regulator_get(dev, "mt6368_vmc");
+	if (IS_ERR_OR_NULL(mos_control)) {
+		fg_err("%s: Failed to get mt6368_vmc regulator\n", __func__);
+		return -ENODEV;
+	}
+
+	if (en) {
+		ret = regulator_set_voltage(mos_control, vbus_vol, vbus_vol);
+		ret = regulator_enable(mos_control);
+	} else {
+		ret = regulator_disable(mos_control);
+	}
+
+	return ret;
+}
 static int fg_check_device(struct bq_fg_chip *bq)
 {
 	u8 data[32];
@@ -2156,6 +2193,8 @@ static int fg_probe(struct i2c_client *client, const struct i2c_device_id *id)
 	fg_info("The FG name is %s, addr is 0x%02X\n", client->name,
 		client->addr);
 
+	charger_parse_cmdline();
+
 	bq = devm_kzalloc(&client->dev, sizeof(*bq), GFP_DMA);
 	if (!bq)
 		return -ENOMEM;
@@ -2178,6 +2217,13 @@ static int fg_probe(struct i2c_client *client, const struct i2c_device_id *id)
 	bq->i2c_error_count = 0;
 	mutex_init(&bq->i2c_rw_lock);
 	mutex_init(&bq->data_lock);
+
+	if (ZIRCON == product_name) {
+		ret = enable_FG_I2CMOS(bq, true);
+		if (ret < 0)
+			fg_err("%s: Failed to enable FG I2C MOS, FG I2C may NOT work!\n",
+			       __func__);
+	}
 
 	fg_check_device(bq);
 

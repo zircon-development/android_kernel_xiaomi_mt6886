@@ -251,6 +251,12 @@ struct sw_jeita_data {
 	bool error_recovery_flag;
 };
 
+enum product_name {
+	UNKNOWN,
+	COROT,
+	ZIRCON,
+};
+
 struct mtk_charger_algorithm {
 
 	int (*do_algorithm)(struct mtk_charger *info);
