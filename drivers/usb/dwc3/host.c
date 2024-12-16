@@ -13,6 +13,8 @@
 #include <linux/usb/hcd.h>
 
 #include "../host/xhci-plat.h"
+#include "../host/xhci.h"
+
 #include "core.h"
 
 static const struct xhci_plat_priv dwc3_xhci_plat_priv = {
