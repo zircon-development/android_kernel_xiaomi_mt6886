@@ -1056,4 +1056,10 @@ config CHARGER_SURFACE
 	  Microsoft Surface devices, i.e. Surface Pro 7, Surface Laptop 3,
 	  Surface Book 3, and Surface Laptop Go.
 
+config RUST_DETECTION
+	bool "support rust detection"
+	default n
+	help
+	support rust detection.
+
 endif # POWER_SUPPLY
