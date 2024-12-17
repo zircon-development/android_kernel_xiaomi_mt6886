@@ -918,6 +918,12 @@ config XMEXT_CHG_PUMP
 	  Say yes here to enable xmext use sc8561 charger_pump driver.
 	  Say no if not using xmext use sc8561 charger_pump driver.
 
+config XMEXT_SC8551A_CHG_PUMP
+	tristate "xmext use sc8551A charger_pump"
+	help
+	  Say yes here to enable xmext use sc8551A charger_pump driver.
+	  Say no if not using xmext use sc8551A charger_pump driver.
+
 config MTK_PUMP_EXPRESS_PLUS_SUPPORT
 	tristate "MediaTek PUMP EXPRESS PLUS"
 	depends on MTK_CHARGER
