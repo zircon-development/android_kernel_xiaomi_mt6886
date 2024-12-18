@@ -43,6 +43,24 @@
 #define	PROP_BATTERY_TEMPERATURE_ADC_TIMEOUT 10
 #define MAX_PROP_NAME_LEN 50
 
+#define	LOW_FAST_ENTRY_SOC	20
+#define	LOW_FAST_EXIT_SOC	40
+#define LOW_FAST_NOT_RESTART_SOC  35
+#define LOW_FAST_HYST_TEMP_LOW 380
+#define LOW_FAST_HYST_TEMP_HIGH 390
+#define	LOW_FAST_SCREEN_TIMEOUT_MS	10000
+
+
+enum smart_chg_functype{
+	SMART_CHG_STATUS_FLAG = 0,
+	SMART_CHG_FEATURE_MIN_NUM = 1,
+	SMART_CHG_NAVIGATION = 1,
+	SMART_CHG_OUTDOOR_CHARGE,
+	SMART_CHG_BATT_LOW_FAST,
+
+	SMART_CHG_FEATURE_MAX_NUM = 15,
+};
+
 #define BMLOG_DEFAULT_LEVEL BMLOG_DEBUG_LEVEL
 
 #define bm_err(fmt, args...)   \
@@ -121,6 +139,23 @@ enum battery_property {
 	BAT_PROP_INIT_DONE,
 	BAT_PROP_FG_RESET,
 	BAT_PROP_LOG_LEVEL,
+	BAT_PROP_NIGHT_CHARGING,
+	BAT_PROP_INPUT_SUSPEND,
+	BAT_PROP_SMART_BATT,
+	BAT_PROP_SHIPMODE_COUNT_RESET,
+	BAT_PROP_SMART_CHG,
+	BAT_PROP_SPORT_MODE,
+	BAT_PROP_HIFI_CONNECT,
+	BAT_PROP_OTG_UI_SUPPORT,
+	BAT_PROP_CID_STATUS,
+	BAT_PROP_CC_TOGGLE,
+#if defined(CONFIG_RUST_DETECTION)
+	BAT_PROP_LPD_DP_RES,
+	BAT_PROP_LPD_DM_RES,
+	BAT_PROP_LPD_SBU1_RES,
+	BAT_PROP_LPD_SBU2_RES,
+	BAT_PROP_LPD_UPDATE_EN,
+#endif
 };
 
 enum property_control_data {
@@ -167,6 +202,7 @@ struct battery_data {
 	/* Add for Battery Service */
 	int bat_batt_vol;
 	int bat_batt_temp;
+	int bat_current;
 };
 
 struct VersionControl {
@@ -927,6 +963,20 @@ struct ag_center_data_st {
 	struct timespec64 times[3];
 };
 
+struct smart_chg {
+	bool en_ret;
+	int active_status;
+	int func_val;
+};
+
+enum smart_chg_low_fast_flat {
+	 THERMAL_CHARGER_MODE_NORMAL,
+	 THERMAL_CHARGER_MODE_ACCELERATE,
+	 DISPLAY_SCREEN_OFF,
+	 DISPLAY_SCREEN_ON,
+	 DISPLAY_SCREEN_AOD,
+};
+
 struct mtk_battery {
 	/*linux driver related*/
 	wait_queue_head_t  wait_que;
@@ -942,6 +992,7 @@ struct mtk_battery {
 	struct sock *mtk_battery_sk;
 
 	struct mtk_battery_algo algo;
+	struct power_supply *ti_bms_psy;
 
 	u_int fgd_pid;
 
@@ -1119,6 +1170,21 @@ struct mtk_battery {
 	int (*resume)(struct mtk_battery *gm);
 
 	int log_level;
+	int thermal_level;
+	int diff_fv_val;
+
+	/* Add for pmic shipmode */
+	bool shipmode_count_reset;
+
+	bool control_cc_toggle;
+#if defined(CONFIG_RUST_DETECTION)
+	int lpd_update_en;
+#endif
+	struct smart_chg smart_chg[SMART_CHG_FEATURE_MAX_NUM + 1];
+
+	int sport_mode;
+
+	bool hifi_connected;
 };
 
 struct mtk_battery_sysfs_field_info {
@@ -1150,7 +1216,7 @@ extern void disable_gauge_irq(struct mtk_gauge *gauge,
 	enum gauge_irq irq);
 extern int bat_get_debug_level(void);
 extern int force_get_tbat(struct mtk_battery *gm, bool update);
-extern int force_get_tbat_internal(struct mtk_battery *gm);
+extern int force_get_tbat_internal(struct mtk_battery *gm, bool update);
 extern int wakeup_fg_algo_cmd(struct mtk_battery *gm,
 	unsigned int flow_state, int cmd, int para1);
 extern int wakeup_fg_algo(struct mtk_battery *gm, unsigned int flow_state);
@@ -1158,8 +1224,6 @@ extern int wakeup_fg_algo(struct mtk_battery *gm, unsigned int flow_state);
 extern int gauge_get_int_property(enum gauge_property gp);
 extern int gauge_get_property(enum gauge_property gp,
 			    int *val);
-extern int gauge_get_property_control(struct mtk_battery *gm,
-	enum gauge_property gp, int *val, int mode);
 extern int gauge_set_property(enum gauge_property gp,
 			    int val);
 extern void gp_number_to_name(char *gp_name, unsigned int gp_no);
