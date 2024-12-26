@@ -679,8 +679,10 @@ void scp_aed(enum SCP_RESET_TYPE type, enum scp_core_id id)
 
 	/* wait for previous coredump complete */
 	while (1) {
+#if IS_ENABLED(CONFIG_MTK_AEE_FEATURE)
 		if (aee_get_mode() == AEE_MODE_CUSTOMER_USER)
 			break;
+#endif
 		ret = wait_for_completion_interruptible_timeout(
 			&scp_coredump_comp, timeout);
 		if (ret == 0) {
