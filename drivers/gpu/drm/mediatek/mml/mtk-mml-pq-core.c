@@ -643,9 +643,11 @@ static int set_sub_task(struct mml_task *task,
 				sub_task->job_id, task->job.jobid,
 				task->config->info.mode,
 				task->config->dual);
+#if IS_ENABLED(CONFIG_MTK_AEE_FEATURE)
 			mml_pq_util_aee("MMLPQ ref is not zero",
 				"jobid:%d",
 				task->job.jobid);
+#endif
 			sub_task->aee_dump_done = true;
 		}
 		atomic_set(&sub_task->result_ref, 0);
