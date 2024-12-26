@@ -1223,14 +1223,18 @@ static int __init mtk_btag_init(void)
 	mtk_btag_blk_pm_init();
 #endif
 	mtk_btag_install_tracepoints();
+#if IS_ENABLED(CONFIG_MTK_AEE_FEATURE)
 	mrdump_set_extra_dump(AEE_EXTRA_FILE_BLOCKIO, mtk_btag_get_aee_buffer);
+#endif
 
 	return 0;
 }
 
 static void __exit mtk_btag_exit(void)
 {
+#if IS_ENABLED(CONFIG_MTK_AEE_FEATURE)
 	mrdump_set_extra_dump(AEE_EXTRA_FILE_BLOCKIO, NULL);
+#endif
 	proc_remove(btag_proc_root);
 	mtk_btag_uninstall_tracepoints();
 	kfree(blockio_aee_buffer);
