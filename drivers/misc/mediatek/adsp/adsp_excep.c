@@ -87,6 +87,7 @@ static inline u32 copy_from_adsp_shared_memory(void *buf, u32 offset,
 	return copy_from_buffer(buf, -1, mem_addr, mem_size, offset, size);
 }
 
+#if IS_ENABLED(CONFIG_MTK_AEE_FEATURE)
 static u32 write_mem_header(void *buf, size_t size, const char *mem_name, u32 mem_size)
 {
 	struct adsp_mem_header hd = {0};
@@ -102,7 +103,6 @@ static u32 write_mem_header(void *buf, size_t size, const char *mem_name, u32 me
 	return sizeof(hd);
 }
 
-#if IS_ENABLED(CONFIG_MTK_AEE_FEATURE)
 static inline u32 dump_adsp_shared_memory(void *buf, size_t size, int id, const char *mem_name)
 {
 	u32 n = 0;
