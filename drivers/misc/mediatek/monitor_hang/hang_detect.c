@@ -1485,6 +1485,7 @@ static int run_callback(void)
 	return 0;
 }
 
+#if IS_ENABLED(CONFIG_MTK_AEE_IPANIC)
 static void show_task_info(void)
 {
 	struct task_struct *p, *t;
@@ -1494,6 +1495,7 @@ static void show_task_info(void)
 		store_task_info(t);
 	rcu_read_unlock();
 }
+#endif
 
 static void show_task_backtrace(void)
 {
@@ -1856,7 +1858,9 @@ static int __init monitor_hang_init(void)
 	INIT_LIST_HEAD(&hc_list.list);
 
 	hang_detect_init();
+#if IS_ENABLED(CONFIG_MTK_AEE_IPANIC)
 	mrdump_regist_hang_bt(show_task_info);
+#endif
 
 #if IS_ENABLED(CONFIG_MTK_HANG_PROC)
 	/* debug node: sys/kernel/debug/monitor_hang/monitor_hang */
@@ -1872,7 +1876,9 @@ static int __init monitor_hang_init(void)
 
 static void __exit monitor_hang_exit(void)
 {
+#if IS_ENABLED(CONFIG_MTK_AEE_IPANIC)
 	mrdump_regist_hang_bt(NULL);
+#endif
 	misc_deregister(&Hang_Monitor_dev);
 	kfree(thread_array);
 #ifdef CONFIG_MTK_HANG_DETECT_DB
