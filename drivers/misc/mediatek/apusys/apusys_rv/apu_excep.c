@@ -335,8 +335,10 @@ static void apu_coredump_work_func(struct work_struct *p_work)
 		apu_regdump();
 		/* since exception is triggered, so bypass power off timeout check */
 		apu->bypass_pwr_off_chk = true;
+#if IS_ENABLED(CONFIG_MTK_AEE_FEATURE)
 		apusys_rv_exception_aee_warn(
 			apusys_assert_module_name[apu->conf_buf->ramdump_module]);
+#endif
 		dev_info(dev, "%s +\n", __func__);
 		return;
 	}
